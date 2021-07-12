@@ -1,4 +1,3 @@
-
 # tests as json
 # tests need to be serializable
 # generate tests to pdf
@@ -6,9 +5,24 @@
 
 import json
 from dataclasses import dataclass, field
+from enum import Enum, auto
 
 from dataclasses_serialization.json import JSONSerializer
 
+
+class Difficulty(Enum):
+    EASY = auto()
+    MEDIUM = auto()
+    HARD = auto()
+
+
+class QuestionType(Enum):
+    BOOLEAN = auto()
+    MULTIPLE_CHOICE = auto()
+    SELECT_ALL = auto()
+    SHORT_ANSWER = auto()
+
+# TODO serialize enums
 
 @dataclass
 class Answer:
@@ -23,8 +37,9 @@ class Answer:
 @dataclass
 class Question:
     prompt: str
+    questionType: QuestionType
     answers: list[Answer] = field(default_factory=list)
-    difficulty: int = 0
+    difficulty: Difficulty = Difficulty.MEDIUM
     is_required: bool = False
 
     @staticmethod
@@ -33,6 +48,7 @@ class Question:
             prompt=question["prompt"],
             answers=[Answer.deserialize_answer(answer) for answer in question["answers"]],
         )
+
 
 @dataclass
 class TestBank:
@@ -45,6 +61,7 @@ class TestBank:
             title=testbank["title"],
             questions=[Question.deserialize_question(question) for question in testbank["questions"]],
         )
+
 
 def testbank_to_file(testbank: TestBank, filepath: str = None):
     # if filepath is None:
