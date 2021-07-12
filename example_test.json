@@ -1,0 +1,68 @@
+{
+    "title": "General Knowledge",
+    "questions": [
+        {
+            "prompt": "Grant lives in Grant's tomb.",
+            "question_type": "BOOLEAN",
+            "boolean": false,
+            "difficulty": "EASY",
+            "is_required": true
+        },
+        {
+            "prompt": "What color is the sky?",
+            "question_type": "MULTIPLE_CHOICE",
+            "answers": [
+                {
+                    "text": "Red",
+                    "is_correct": false
+                },
+                {
+                    "text": "Blue",
+                    "is_correct": true
+                },
+                {
+                    "text": "Green",
+                    "is_correct": false
+                },
+                {
+                    "text": "Black",
+                    "is_correct": false
+                }
+            ],
+            "difficulty": "MEDIUM",
+            "is_required": true
+        },
+        {
+            "prompt": "Which of the following are true statements?",
+            "question_type": "SELECT_ALL",
+            "answers": [
+                {
+                    "text": "Cake is gross.",
+                    "is_correct": false
+                },
+                {
+                    "text": "Dogs are better than cats.",
+                    "is_correct": true
+                },
+                {
+                    "text": "Coffee is overrated.",
+                    "is_correct": false
+                },
+                {
+                    "text": "This test is dumb.",
+                    "is_correct": true
+                }
+            ],
+            "correct_response": null,
+            "difficulty": "MEDIUM",
+            "is_required": false
+        },
+        {
+            "prompt": "Describe the marine corps in your own words.",
+            "question_type": "SHORT_ANSWER",
+            "correct_response": "dumb",
+            "difficulty": "HARD",
+            "is_required": true
+        }
+    ]
+}

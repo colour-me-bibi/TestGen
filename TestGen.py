@@ -50,16 +50,16 @@ class QuestionType(Enum):
         label = label.replace(" ", "").lower()
 
         if "bool" in label:
-            return Difficulty.BOOLEAN
+            return QuestionType.BOOLEAN
 
-        if label == "multiplechoice":
-            return Difficulty.MULTIPLE_CHOICE
+        if "multiple" in label:
+            return QuestionType.MULTIPLE_CHOICE
 
-        if label == "selectall":
-            return Difficulty.SELECT_ALL
+        if "select" in label:
+            return QuestionType.SELECT_ALL
 
-        if label == "shortanswer":
-            return Difficulty.SHORT_ANSWER
+        if "short" in label:
+            return QuestionType.SHORT_ANSWER
 
         raise NotImplementedError
 
@@ -78,19 +78,33 @@ class Answer:
 class Question:
     prompt: str
     question_type: QuestionType
+    boolean: bool = None
     answers: list[Answer] = field(default_factory=list)
+    correct_response: str = None  # could be EEIs as a list of strings
     difficulty: Difficulty = Difficulty.MEDIUM
     is_required: bool = False
 
     @staticmethod
     def deserialize_question(question):
-        return Question(
-            prompt=question["prompt"],
-            question_type=QuestionType.from_str(question["question_type"]),
-            answers=[Answer.deserialize_answer(answer) for answer in question["answers"]],
-            difficulty=Difficulty(question["difficulty"]),
-            is_required=question["is_required"],
-        )
+        kwargs = {
+            "prompt": question["prompt"],
+            "question_type": QuestionType.from_str(question["question_type"]),
+            "is_required": question["is_required"],
+        }
+
+        if "boolean" in question:
+            kwargs["boolean"] = question["boolean"]
+
+        if "answers" in question:
+            kwargs["answers"] = [Answer.deserialize_answer(answer) for answer in question["answers"]]
+
+        if "difficulty" in question:
+            kwargs["difficulty"] = Difficulty.from_str(question["difficulty"])
+
+        if "is_required" in question:
+            kwargs["is_required"] = question["is_required"]
+
+        return Question(**kwargs)
 
 
 @dataclass
@@ -121,4 +135,6 @@ def testbank_from_file(filepath: str) -> TestBank:
 
 
 if __name__ == "__main__":
-    pass
+    test = testbank_from_file("example_test.json")
+
+    print(test.title)
