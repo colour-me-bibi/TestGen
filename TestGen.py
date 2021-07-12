@@ -15,6 +15,7 @@ import json
 import random
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from string import ascii_uppercase
 
 # from dataclasses_serialization.json import JSONSerializer
 
@@ -137,27 +138,53 @@ def testbank_from_file(filepath: str) -> TestBank:
 
     return TestBank.deserialize_testbank(data)
 
+
 @dataclass
 class Test:
     test_id: int
     questions: list[Question]
+    answer_key: list[str] = field(default_factory=list)
 
     def __post_init__(self):
-        self.answer_key = None  # TODO
+        for question in self.questions:
+            if question.question_type == QuestionType.BOOLEAN:
+                self.answer_key.append(str(question.boolean))
+            elif question.question_type == QuestionType.MULTIPLE_CHOICE:
+                self.answer_key.append(
+                    " or ".join(ascii_uppercase[i] for i, answer in question.answers if answer.is_correct)
+                )
+            elif question.question_type == QuestionType.MULTIPLE_CHOICE:
+                self.answer_key.append(
+                    " and ".join(ascii_uppercase[i] for i, answer in question.answers if answer.is_correct)
+                )
+            elif question.question_type == QuestionType.SHORT_ANSWER:
+                self.answer_key.append(question.correct_response)
+            else:
+                raise NotImplementedError
+
 
 def generate_n_tests(testbank: TestBank, n: int, ratio: tuple[int, int, int]):
     required, nonrequired = it.groupby(testbank.questions, key=lambda question: question.is_required)
     easy, medium, hard = it.groupby(nonrequired, key=lambda question: question.difficulty)
 
     multiple = 1
-    while len(easy) < (multiple + 1) * ratio[0] and len(medium) < (multiple + 1) * ratio[1] and len(hard) < (multiple + 1) * ratio[2]:
+    while (
+        len(easy) < (multiple + 1) * ratio[0]
+        and len(medium) < (multiple + 1) * ratio[1]
+        and len(hard) < (multiple + 1) * ratio[2]
+    ):
         multiple += 1
 
     tests = list()
 
     for i in range(1, n + 1):
-        questions = required + random.sample(easy, ratio[0] * multiple) + random.sample(medium, ratio[1] * multiple) + random.sample(hard, ratio[2] * multiple)
-        
+        questions = (
+            required
+            + random.sample(easy, ratio[0] * multiple)
+            + random.sample(medium, ratio[1] * multiple)
+            + random.sample(hard, ratio[2] * multiple)
+        )
+
         for question in questions:
             question.shuffle_answers()
 
@@ -170,7 +197,6 @@ def generate_n_tests(testbank: TestBank, n: int, ratio: tuple[int, int, int]):
 
 def tests_to_doc(tests: list[Test], filename: str = None):
     pass
-
 
 
 if __name__ == "__main__":
