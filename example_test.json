@@ -6,7 +6,7 @@
             "question_type": "BOOLEAN",
             "boolean": false,
             "difficulty": "EASY",
-            "is_required": true
+            "is_required": false
         },
         {
             "prompt": "What color is the sky?",
@@ -53,7 +53,6 @@
                     "is_correct": true
                 }
             ],
-            "correct_response": null,
             "difficulty": "MEDIUM",
             "is_required": false
         },
@@ -62,7 +61,7 @@
             "question_type": "SHORT_ANSWER",
             "correct_response": "dumb",
             "difficulty": "HARD",
-            "is_required": true
+            "is_required": false
         }
     ]
 }
