@@ -6,16 +6,17 @@
 __author__ = "Benjamin Foreman (bennyforeman1@gmail.com)"
 
 
-# TODO serialize enums
 # TODO test generation
 # TODO tests to pdfs
 
 
+import itertools as it
 import json
+import random
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from dataclasses_serialization.json import JSONSerializer
+# from dataclasses_serialization.json import JSONSerializer
 
 
 class Difficulty(Enum):
@@ -106,6 +107,9 @@ class Question:
 
         return Question(**kwargs)
 
+    def shuffle_answers(self):
+        random.shuffle(self.answers)
+
 
 @dataclass
 class TestBank:
@@ -120,11 +124,11 @@ class TestBank:
         )
 
 
-def testbank_to_file(testbank: TestBank, filename: str = None):
-    filename = f"{filename}.json" if filename is not None else f"{testbank.title}.json"
+# def testbank_to_file(testbank: TestBank, filename: str = None):
+#     filename = f"{filename}.json" if filename is not None else f"{testbank.title}.json"
 
-    with open(filename, "w") as wf:
-        json.dump(JSONSerializer.serialize(testbank), wf, indent=4)
+#     with open(filename, "w") as wf:
+#         json.dump(JSONSerializer.serialize(testbank), wf, indent=4)
 
 
 def testbank_from_file(filepath: str) -> TestBank:
@@ -132,6 +136,41 @@ def testbank_from_file(filepath: str) -> TestBank:
         data = json.load(rf)
 
     return TestBank.deserialize_testbank(data)
+
+@dataclass
+class Test:
+    test_id: int
+    questions: list[Question]
+
+    def __post_init__(self):
+        self.answer_key = None  # TODO
+
+def generate_n_tests(testbank: TestBank, n: int, ratio: tuple[int, int, int]):
+    required, nonrequired = it.groupby(testbank.questions, key=lambda question: question.is_required)
+    easy, medium, hard = it.groupby(nonrequired, key=lambda question: question.difficulty)
+
+    multiple = 1
+    while len(easy) < (multiple + 1) * ratio[0] and len(medium) < (multiple + 1) * ratio[1] and len(hard) < (multiple + 1) * ratio[2]:
+        multiple += 1
+
+    tests = list()
+
+    for i in range(1, n + 1):
+        questions = required + random.sample(easy, ratio[0] * multiple) + random.sample(medium, ratio[1] * multiple) + random.sample(hard, ratio[2] * multiple)
+        
+        for question in questions:
+            question.shuffle_answers()
+
+        random.shuffle(questions)
+
+        tests.append(Test(i, questions))
+
+    return tests
+
+
+def tests_to_doc(tests: list[Test], filename: str = None):
+    pass
+
 
 
 if __name__ == "__main__":
