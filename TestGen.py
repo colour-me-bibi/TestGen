@@ -6,14 +6,14 @@
 __author__ = "Benjamin Foreman (bennyforeman1@gmail.com)"
 
 
-import itertools as it
 import json
 import random
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from string import ascii_uppercase
 
-from docx import Document
+from docx import Document  # pip install python-docx
 
 
 class Difficulty(Enum):
@@ -123,13 +123,6 @@ class TestBank:
         )
 
 
-# def testbank_to_file(testbank: TestBank, filename: str = None):
-#     filename = f"{filename}.json" if filename is not None else f"{testbank.title}.json"
-
-#     with open(filename, "w") as wf:
-#         json.dump(JSONSerializer.serialize(testbank), wf, indent=4)
-
-
 def testbank_from_file(filepath: str) -> TestBank:
     with open(filepath, "r") as rf:
         data = json.load(rf)
@@ -162,15 +155,17 @@ class Test:
 
 
 def generate_n_tests(testbank: TestBank, n: int, ratio: tuple[int, int, int]):
-    required = [question for question in testbank.questions if question.is_required]
-    nonrequired = [question for question in testbank.questions if not question.is_required]
+    grouped_is_required = defaultdict(list)
+    for question in testbank.questions:
+        grouped_is_required[question.is_required].append(question)
 
-    easy = [question for question in nonrequired if question.difficulty == Difficulty.EASY]
-    medium = [question for question in nonrequired if question.difficulty == Difficulty.MEDIUM]
-    hard = [question for question in nonrequired if question.difficulty == Difficulty.HARD]
+    required, nonrequired = grouped_is_required[True], grouped_is_required[False]
 
-    # required, nonrequired = tuple(it.groupby(testbank.questions, key=lambda question: question.is_required))
-    # easy, medium, hard = tuple(it.groupby(nonrequired, key=lambda question: question.difficulty))
+    grouped_difficulty = defaultdict(list)
+    for question in nonrequired:
+        grouped_difficulty[question.difficulty].append(question)
+
+    easy, medium, hard = grouped_difficulty[Difficulty.EASY], grouped_difficulty[Difficulty.MEDIUM], grouped_difficulty[Difficulty.HARD]
 
     multiple = 1
     while (
