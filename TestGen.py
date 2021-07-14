@@ -16,27 +16,6 @@ from string import ascii_uppercase
 from docx import Document  # pip install python-docx
 
 
-class Difficulty(Enum):
-    EASY = auto()
-    MEDIUM = auto()
-    HARD = auto()
-
-    @staticmethod
-    def from_str(label: str):  # TODO could maybe be better
-        label = label.replace(" ", "").lower()
-
-        if label == "easy":
-            return Difficulty.EASY
-
-        if label == "medium":
-            return Difficulty.MEDIUM
-
-        if label == "hard":
-            return Difficulty.HARD
-
-        raise NotImplementedError
-
-
 class QuestionType(Enum):
     BOOLEAN = auto()
     MULTIPLE_CHOICE = auto()
@@ -69,7 +48,14 @@ class Answer:
 
     @staticmethod
     def deserialize_answer(answer):
-        return Answer(text=answer["text"], is_correct=answer["is_correct"])
+        kwargs = {
+            "text": answer["text"],
+        }
+
+        if "is_correct" in answer:
+            kwargs["is_correct"] = answer["is_correct"]
+
+        return Answer(**kwargs)
 
 
 @dataclass
@@ -78,8 +64,7 @@ class Question:
     question_type: QuestionType
     boolean: bool = None
     answers: list[Answer] = field(default_factory=list)
-    correct_response: str = None  # could be EEIs as a list of strings
-    difficulty: Difficulty = Difficulty.MEDIUM
+    response: str = None  # could be EEIs as a list of strings
     is_required: bool = False
 
     @staticmethod
@@ -95,11 +80,8 @@ class Question:
         if "answers" in question:
             kwargs["answers"] = [Answer.deserialize_answer(answer) for answer in question["answers"]]
 
-        if "correct_response" in question:
-            kwargs["correct_response"] = question["correct_response"]
-
-        if "difficulty" in question:
-            kwargs["difficulty"] = Difficulty.from_str(question["difficulty"])
+        if "response" in question:
+            kwargs["response"] = question["response"]
 
         if "is_required" in question:
             kwargs["is_required"] = question["is_required"]
@@ -122,12 +104,12 @@ class TestBank:
             questions=[Question.deserialize_question(question) for question in testbank["questions"]],
         )
 
+    @staticmethod
+    def from_json_file(filepath: str):
+        with open(filepath, "r") as rf:
+            data = json.load(rf)
 
-def testbank_from_file(filepath: str) -> TestBank:
-    with open(filepath, "r") as rf:
-        data = json.load(rf)
-
-    return TestBank.deserialize_testbank(data)
+        return TestBank.deserialize_testbank(data)
 
 
 @dataclass
@@ -149,39 +131,49 @@ class Test:
                     " and ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
                 )
             elif question.question_type == QuestionType.SHORT_ANSWER:
-                self.answer_key.append(question.correct_response)
+                self.answer_key.append(question.response)
             else:
                 raise NotImplementedError
 
 
-def generate_n_tests(testbank: TestBank, n: int, ratio: tuple[int, int, int]):
+def generate_n_tests(testbank: TestBank, n: int):
     grouped_is_required = defaultdict(list)
     for question in testbank.questions:
         grouped_is_required[question.is_required].append(question)
 
     required, nonrequired = grouped_is_required[True], grouped_is_required[False]
 
-    grouped_difficulty = defaultdict(list)
+    grouped_type = defaultdict(list)
     for question in nonrequired:
-        grouped_difficulty[question.difficulty].append(question)
+        grouped_type[question.question_type].append(question)
 
-    easy, medium, hard = grouped_difficulty[Difficulty.EASY], grouped_difficulty[Difficulty.MEDIUM], grouped_difficulty[Difficulty.HARD]
+    boolean, multiple_choice, select_all, short_answer = (
+        grouped_type[QuestionType.BOOLEAN],
+        grouped_type[QuestionType.MULTIPLE_CHOICE],
+        grouped_type[QuestionType.SELECT_ALL],
+        grouped_type[QuestionType.SHORT_ANSWER],
+    )
 
-    multiple = 1
-    while (
-        len(easy) >= (multiple + 1) * ratio[0]
-        and len(medium) >= (multiple + 1) * ratio[1]
-        and len(hard) >= (multiple + 1) * ratio[2]
-    ):
-        multiple += 1
+    print(f"Required Questions: {len(required)}")
+    print(f"\tof the {len(nonrequired)} nonrequired questions there are")
+    print(f"\t\t{len(boolean)} boolean questions")
+    print(f"\t\t{len(multiple_choice)} multiple_choice questions")
+    print(f"\t\t{len(select_all)} select_all questions")
+    print(f"\t\t{len(short_answer)} short_answer questions")
+
+    boolean_count = input(f"Require how many boolean questions (max {len(boolean)}) -> ")
+    multiple_choice_count = input(f"Require how many multiple_choice questions (max {len(multiple_choice)}) -> ")
+    select_all_count = input(f"Require how many select_all questions (max {len(select_all)}) -> ")
+    short_answer_count = input(f"Require how many short_answer questions (max {len(short_answer)}) -> ")
 
     tests = list()
     for i in range(1, n + 1):
         questions = (
             required
-            + random.sample(easy, ratio[0] * multiple)
-            + random.sample(medium, ratio[1] * multiple)
-            + random.sample(hard, ratio[2] * multiple)
+            + random.sample(boolean, boolean_count)
+            + random.sample(multiple_choice, multiple_choice_count)
+            + random.sample(select_all, select_all_count)
+            + random.sample(short_answer, short_answer_count)
         )
 
         for question in questions:
@@ -205,7 +197,14 @@ def tests_to_doc(tests: list[Test], title: str):
 
             if question.question_type == QuestionType.BOOLEAN:
                 document.add_paragraph("\tTrue or False")
-            elif question.question_type in (QuestionType.MULTIPLE_CHOICE, QuestionType.SELECT_ALL):
+            elif question.question_type == QuestionType.MULTIPLE_CHOICE:
+                document.add_paragraph("Multiple choice:")
+
+                for answer_idx, answer in enumerate(question.answers):
+                    document.add_paragraph(f"\t{ascii_uppercase[answer_idx]} - {answer.text}")
+            elif question.question_type == QuestionType.SELECT_ALL:
+                document.add_paragraph("Select all that apply:")
+
                 for answer_idx, answer in enumerate(question.answers):
                     document.add_paragraph(f"\t{ascii_uppercase[answer_idx]} - {answer.text}")
             elif question.question_type == QuestionType.SHORT_ANSWER:
@@ -219,7 +218,7 @@ def tests_to_doc(tests: list[Test], title: str):
     for test_idx, test in enumerate(tests, 1):
         document.add_heading(f"{title} (ID: {test_idx})", 0)
 
-        for answer_idx, answer in enumerate(test.answer_key):
+        for answer_idx, answer in enumerate(test.answer_key, 1):
             document.add_paragraph(f"{answer_idx} - {answer}")
 
         document.add_paragraph()
@@ -228,8 +227,12 @@ def tests_to_doc(tests: list[Test], title: str):
     document.save(f"{title}-{len(tests)}.docx")
 
 
+def parse_txt_to_testbank(filepath: str):
+    pass
+
+
 if __name__ == "__main__":
-    testbank = testbank_from_file("example_test.json")
+    testbank = TestBank.from_json_file("example_test.json")
 
     tests = generate_n_tests(testbank, 5, (1, 1, 1))
 
