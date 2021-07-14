@@ -1,0 +1,42 @@
+Title
+    General Knowledge
+
+Boolean
+    - The sky is blue.
+        True
+
+    Your mom is fat.
+        False
+
+Multiple Choice
+    What color is the sky?
+        - Blue
+        Red
+        Green
+        Orange
+
+    - What color is the sky?
+        - Blue
+        Red
+        Green
+        Orange
+
+Select All
+    Which of the following are true statements?
+        - The sky is blue.
+        Your mom is fat.
+        My feet are stinky.
+        - Paper is usually white.
+
+    Which of the following are true statements?
+        - The sky is blue.
+        Your mom is fat.
+        My feet are stinky.
+        - Paper is usually white.
+
+Short Answer
+    Describle IP in your own words.
+        numbers that do things
+
+    - Describle IP in your own words.
+        numbers that do things

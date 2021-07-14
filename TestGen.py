@@ -6,6 +6,7 @@
 __author__ = "Benjamin Foreman (bennyforeman1@gmail.com)"
 
 
+import itertools as it
 import json
 import random
 from collections import defaultdict
@@ -46,17 +47,6 @@ class Answer:
     text: str
     is_correct: bool = False
 
-    @staticmethod
-    def deserialize_answer(answer):
-        kwargs = {
-            "text": answer["text"],
-        }
-
-        if "is_correct" in answer:
-            kwargs["is_correct"] = answer["is_correct"]
-
-        return Answer(**kwargs)
-
 
 @dataclass
 class Question:
@@ -66,27 +56,6 @@ class Question:
     answers: list[Answer] = field(default_factory=list)
     response: str = None  # could be EEIs as a list of strings
     is_required: bool = False
-
-    @staticmethod
-    def deserialize_question(question):
-        kwargs = {
-            "prompt": question["prompt"],
-            "question_type": QuestionType.from_str(question["question_type"]),
-        }
-
-        if "boolean" in question:
-            kwargs["boolean"] = question["boolean"]
-
-        if "answers" in question:
-            kwargs["answers"] = [Answer.deserialize_answer(answer) for answer in question["answers"]]
-
-        if "response" in question:
-            kwargs["response"] = question["response"]
-
-        if "is_required" in question:
-            kwargs["is_required"] = question["is_required"]
-
-        return Question(**kwargs)
 
     def shuffle_answers(self):
         random.shuffle(self.answers)
@@ -98,18 +67,8 @@ class TestBank:
     questions: list[Question] = field(default_factory=list)
 
     @staticmethod
-    def deserialize_testbank(testbank):
-        return TestBank(
-            title=testbank["title"],
-            questions=[Question.deserialize_question(question) for question in testbank["questions"]],
-        )
-
-    @staticmethod
-    def from_json_file(filepath: str):
-        with open(filepath, "r") as rf:
-            data = json.load(rf)
-
-        return TestBank.deserialize_testbank(data)
+    def from_file(filepath: str):
+        pass  # TODO
 
 
 @dataclass
@@ -154,12 +113,15 @@ def generate_n_tests(testbank: TestBank, n: int):
         grouped_type[QuestionType.SHORT_ANSWER],
     )
 
-    print(f"Required Questions: {len(required)}")
-    print(f"\tof the {len(nonrequired)} nonrequired questions there are")
+    print(f"{len(testbank.questions)} total questions")
+    print(f"\t{len(required)} required questions")
+    print(f"\t{len(nonrequired)} nonrequired questions")
     print(f"\t\t{len(boolean)} boolean questions")
     print(f"\t\t{len(multiple_choice)} multiple_choice questions")
     print(f"\t\t{len(select_all)} select_all questions")
     print(f"\t\t{len(short_answer)} short_answer questions")
+
+    # TODO input validation
 
     boolean_count = input(f"Require how many boolean questions (max {len(boolean)}) -> ")
     multiple_choice_count = input(f"Require how many multiple_choice questions (max {len(multiple_choice)}) -> ")
@@ -170,10 +132,10 @@ def generate_n_tests(testbank: TestBank, n: int):
     for i in range(1, n + 1):
         questions = (
             required
-            + random.sample(boolean, boolean_count)
-            + random.sample(multiple_choice, multiple_choice_count)
-            + random.sample(select_all, select_all_count)
-            + random.sample(short_answer, short_answer_count)
+            + random.sample(boolean, int(boolean_count))
+            + random.sample(multiple_choice, int(multiple_choice_count))
+            + random.sample(select_all, int(select_all_count))
+            + random.sample(short_answer, int(short_answer_count))
         )
 
         for question in questions:
@@ -227,13 +189,51 @@ def tests_to_doc(tests: list[Test], title: str):
     document.save(f"{title}-{len(tests)}.docx")
 
 
+def parse_prompt(string: str):
+    is_required = string.startswith("-")
+    prompt = string.lstrip("-").lstrip() if is_required else string
+
+    return prompt, is_required
+
+
+def lcount(string: str, *patterns: list[str]):
+    return max(len(string) - len(string.lstrip(pattern)) for pattern in patterns)
+
+
 def parse_txt_to_testbank(filepath: str):
-    pass
+    with open(filepath) as rf:
+        lines = (line for line in (line.rstrip() for line in rf.readlines()) if line)
+
+    groups = it.groupby(lines, key=lambda line: lcount(line, " ", "\t"))
+
+    # next(groups)  # title marker
+    # testbank = TestBank(title=list(next(groups)[1])[0].lstrip())
+
+    while (group := next(groups, None)) is not None:
+        count, items = group[0], [x.lstrip() for x in group[1]]
+
+        #     if count == 0:
+        #         if "title" in items[0]:
+        #             title = items[0]
+        #         else:
+        #             if "bool" in items[0].replace(" ", "").lower():
+        #                 question_type = QuestionType.BOOLEAN
+        #             elif "multiple" in items[0].replace(" ", "").lower():
+        #                 question_type = QuestionType.MULTIPLE_CHOICE
+        #             elif "select" in items[0].replace(" ", "").lower():
+        #                 question_type = QuestionType.SELECT_ALL
+        #             elif "short" in items[0].replace(" ", "").lower():
+        #                 question_type = QuestionType.SHORT_ANSWER
+        #     elif count
+
+        print(count, items)
 
 
 if __name__ == "__main__":
-    testbank = TestBank.from_json_file("example_test.json")
+    # testbank = TestBank.from_json_file("example_test.json")
 
-    tests = generate_n_tests(testbank, 5, (1, 1, 1))
+    # tests = generate_n_tests(testbank, 5)
 
-    tests_to_doc(tests, testbank.title)
+    # tests_to_doc(tests, testbank.title)
+
+    parse_txt_to_testbank("example_test.txt")
