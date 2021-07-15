@@ -7,7 +7,6 @@ __author__ = "Benjamin Foreman (bennyforeman1@gmail.com)"
 
 
 import itertools as it
-import json
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -106,14 +105,13 @@ def get_input(prompt: str, cast=lambda x: x, validation=lambda x: True):
     while True:
         try:
             response = cast(input(prompt))
-            
+
             if not validation(response):
                 raise ValueError
-            
+
             return response
         except Exception:
             print(f"{response} is not a valid input.")
-
 
 
 def generate_n_tests(testbank: TestBank, n: int):
@@ -143,13 +141,25 @@ def generate_n_tests(testbank: TestBank, n: int):
     print(f"\t\t{len(short_answer)} short_answer questions")
 
     if len(boolean):
-        boolean_count = get_input(f"Require how many boolean questions (max {len(boolean)}) -> ", int, lambda x: x <= len(boolean))
+        boolean_count = get_input(
+            f"Require how many boolean questions (max {len(boolean)}) -> ", int, lambda x: x <= len(boolean)
+        )
     if len(multiple_choice):
-        multiple_choice_count = get_input(f"Require how many multiple_choice questions (max {len(multiple_choice)}) -> ", int, lambda x: x <= len(multiple_choice))
+        multiple_choice_count = get_input(
+            f"Require how many multiple_choice questions (max {len(multiple_choice)}) -> ",
+            int,
+            lambda x: x <= len(multiple_choice),
+        )
     if len(select_all):
-        select_all_count = get_input(f"Require how many select_all questions (max {len(select_all)}) -> ", int, lambda x: x <= len(select_all))
+        select_all_count = get_input(
+            f"Require how many select_all questions (max {len(select_all)}) -> ", int, lambda x: x <= len(select_all)
+        )
     if len(short_answer):
-        short_answer_count = get_input(f"Require how many short_answer questions (max {len(short_answer)}) -> ", int, lambda x: x <= len(short_answer))
+        short_answer_count = get_input(
+            f"Require how many short_answer questions (max {len(short_answer)}) -> ",
+            int,
+            lambda x: x <= len(short_answer),
+        )
 
     tests = list()
     for i in range(1, n + 1):
@@ -227,7 +237,10 @@ def parse_txt_to_testbank(filepath: str):
     with open(filepath) as rf:
         lines = (line for line in (line.rstrip() for line in rf.readlines()) if line)
 
-    groups = ((key, [x.lstrip() for x in group]) for key, group in it.groupby(lines, key=lambda line: lcount(line, " ", "\t")))
+    groups = (
+        (key, [x.lstrip() for x in group])
+        for key, group in it.groupby(lines, key=lambda line: lcount(line, " ", "\t"))
+    )
 
     next(groups)  # title marker
     testbank = TestBank(title=list(next(groups)[1])[0].lstrip())
