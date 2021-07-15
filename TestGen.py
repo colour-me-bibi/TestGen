@@ -47,6 +47,13 @@ class Answer:
     text: str
     is_correct: bool = False
 
+    @staticmethod
+    def from_marked_string(string: str):
+        is_correct = string.startswith("-")
+        text = string.lstrip("-").lstrip() if is_correct else string
+
+        return Answer(text=text, is_correct=is_correct)
+
 
 @dataclass
 class Question:
@@ -95,6 +102,20 @@ class Test:
                 raise NotImplementedError
 
 
+def get_input(prompt: str, cast=lambda x: x, validation=lambda x: True):
+    while True:
+        try:
+            response = cast(input(prompt))
+            
+            if not validation(response):
+                raise ValueError
+            
+            return response
+        except Exception:
+            print(f"{response} is not a valid input.")
+
+
+
 def generate_n_tests(testbank: TestBank, n: int):
     grouped_is_required = defaultdict(list)
     for question in testbank.questions:
@@ -121,12 +142,14 @@ def generate_n_tests(testbank: TestBank, n: int):
     print(f"\t\t{len(select_all)} select_all questions")
     print(f"\t\t{len(short_answer)} short_answer questions")
 
-    # TODO input validation
-
-    boolean_count = input(f"Require how many boolean questions (max {len(boolean)}) -> ")
-    multiple_choice_count = input(f"Require how many multiple_choice questions (max {len(multiple_choice)}) -> ")
-    select_all_count = input(f"Require how many select_all questions (max {len(select_all)}) -> ")
-    short_answer_count = input(f"Require how many short_answer questions (max {len(short_answer)}) -> ")
+    if len(boolean):
+        boolean_count = get_input(f"Require how many boolean questions (max {len(boolean)}) -> ", int, lambda x: x <= len(boolean))
+    if len(multiple_choice):
+        multiple_choice_count = get_input(f"Require how many multiple_choice questions (max {len(multiple_choice)}) -> ", int, lambda x: x <= len(multiple_choice))
+    if len(select_all):
+        select_all_count = get_input(f"Require how many select_all questions (max {len(select_all)}) -> ", int, lambda x: x <= len(select_all))
+    if len(short_answer):
+        short_answer_count = get_input(f"Require how many short_answer questions (max {len(short_answer)}) -> ", int, lambda x: x <= len(short_answer))
 
     tests = list()
     for i in range(1, n + 1):
@@ -189,11 +212,11 @@ def tests_to_doc(tests: list[Test], title: str):
     document.save(f"{title}-{len(tests)}.docx")
 
 
-def parse_prompt(string: str):
-    is_required = string.startswith("-")
-    prompt = string.lstrip("-").lstrip() if is_required else string
+def parse_marked_string(string: str):
+    is_marked = string.startswith("-")
+    prompt = string.lstrip("-").lstrip() if is_marked else string
 
-    return prompt, is_required
+    return prompt, is_marked
 
 
 def lcount(string: str, *patterns: list[str]):
@@ -204,36 +227,39 @@ def parse_txt_to_testbank(filepath: str):
     with open(filepath) as rf:
         lines = (line for line in (line.rstrip() for line in rf.readlines()) if line)
 
-    groups = it.groupby(lines, key=lambda line: lcount(line, " ", "\t"))
+    groups = ((key, [x.lstrip() for x in group]) for key, group in it.groupby(lines, key=lambda line: lcount(line, " ", "\t")))
 
-    # next(groups)  # title marker
-    # testbank = TestBank(title=list(next(groups)[1])[0].lstrip())
+    next(groups)  # title marker
+    testbank = TestBank(title=list(next(groups)[1])[0].lstrip())
 
+    question_type = None
     while (group := next(groups, None)) is not None:
-        count, items = group[0], [x.lstrip() for x in group[1]]
+        if group[0] == 0:
+            question_type = QuestionType.from_str(group[1][0])
+        else:
+            prompt, is_required = parse_marked_string(group[1][0])
+            answers = next(groups)[1]
 
-        #     if count == 0:
-        #         if "title" in items[0]:
-        #             title = items[0]
-        #         else:
-        #             if "bool" in items[0].replace(" ", "").lower():
-        #                 question_type = QuestionType.BOOLEAN
-        #             elif "multiple" in items[0].replace(" ", "").lower():
-        #                 question_type = QuestionType.MULTIPLE_CHOICE
-        #             elif "select" in items[0].replace(" ", "").lower():
-        #                 question_type = QuestionType.SELECT_ALL
-        #             elif "short" in items[0].replace(" ", "").lower():
-        #                 question_type = QuestionType.SHORT_ANSWER
-        #     elif count
+            kwargs = {
+                "prompt": prompt,
+                "question_type": question_type,
+                "is_required": is_required,
+            }
 
-        print(count, items)
+            if question_type == QuestionType.BOOLEAN:
+                kwargs["boolean"] = "true" in answers[0].lower()
+            elif question_type in (QuestionType.MULTIPLE_CHOICE, QuestionType.SELECT_ALL):
+                kwargs["answers"] = [Answer.from_marked_string(string) for string in group[1]]
+            elif question_type == QuestionType.SHORT_ANSWER:
+                kwargs["response"] = answers[0]
+            else:
+                raise NotImplementedError
+
+            testbank.questions.append(Question(**kwargs))
+
+    return testbank
 
 
 if __name__ == "__main__":
-    # testbank = TestBank.from_json_file("example_test.json")
-
-    # tests = generate_n_tests(testbank, 5)
-
-    # tests_to_doc(tests, testbank.title)
-
-    parse_txt_to_testbank("example_test.txt")
+    testbank = parse_txt_to_testbank("example_test.txt")
+    tests_to_doc(generate_n_tests(testbank, 5), testbank.title)
