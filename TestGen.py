@@ -46,13 +46,6 @@ class Answer:
     text: str
     is_correct: bool = False
 
-    @staticmethod
-    def from_marked_string(string: str):
-        is_correct = string.startswith("-")
-        text = string.lstrip("-").lstrip() if is_correct else string
-
-        return Answer(text=text, is_correct=is_correct)
-
 
 @dataclass
 class Question:
@@ -63,42 +56,12 @@ class Question:
     response: str = None  # could be EEIs as a list of strings
     is_required: bool = False
 
-    def shuffle_answers(self):
-        random.shuffle(self.answers)
-
-
-@dataclass
-class TestBank:
-    title: str
-    questions: list[Question] = field(default_factory=list)
-
-    @staticmethod
-    def from_file(filepath: str):
-        pass  # TODO
-
 
 @dataclass
 class Test:
-    test_id: int
-    questions: list[Question]
-    answer_key: list[str] = field(default_factory=list)
-
-    def __post_init__(self):
-        for question in self.questions:
-            if question.question_type == QuestionType.BOOLEAN:
-                self.answer_key.append(str(question.boolean))
-            elif question.question_type == QuestionType.MULTIPLE_CHOICE:
-                self.answer_key.append(
-                    " or ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
-                )
-            elif question.question_type == QuestionType.SELECT_ALL:
-                self.answer_key.append(
-                    " and ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
-                )
-            elif question.question_type == QuestionType.SHORT_ANSWER:
-                self.answer_key.append(question.response)
-            else:
-                raise NotImplementedError
+    title: str
+    test_id: int = 0
+    questions: list[Question] = field(default_factory=list)
 
 
 def get_input(prompt: str, cast=lambda x: x, validation=lambda x: True):
@@ -114,9 +77,9 @@ def get_input(prompt: str, cast=lambda x: x, validation=lambda x: True):
             print(f"{response} is not a valid input.")
 
 
-def generate_n_tests(testbank: TestBank, n: int):
+def generate_n_tests(test: Test, n: int):
     grouped_is_required = defaultdict(list)
-    for question in testbank.questions:
+    for question in test.questions:
         grouped_is_required[question.is_required].append(question)
 
     required, nonrequired = grouped_is_required[True], grouped_is_required[False]
@@ -132,7 +95,7 @@ def generate_n_tests(testbank: TestBank, n: int):
         grouped_type[QuestionType.SHORT_ANSWER],
     )
 
-    print(f"{len(testbank.questions)} total questions")
+    print(f"{len(test.questions)} total questions")
     print(f"\t{len(required)} required questions")
     print(f"\t{len(nonrequired)} nonrequired questions")
     print(f"\t\t{len(boolean)} boolean questions")
@@ -172,16 +135,17 @@ def generate_n_tests(testbank: TestBank, n: int):
         )
 
         for question in questions:
-            question.shuffle_answers()
-
+            random.shuffle(question.answers)
         random.shuffle(questions)
 
-        tests.append(Test(i, questions))
+        tests.append(Test(title=test.title, questions=questions, test_id=i))
 
     return tests
 
 
-def tests_to_doc(tests: list[Test], title: str):
+def tests_to_doc(tests: list[Test]):
+    title = tests[0].title
+
     document = Document()
 
     for test_idx, test in enumerate(tests, 1):
@@ -213,8 +177,20 @@ def tests_to_doc(tests: list[Test], title: str):
     for test_idx, test in enumerate(tests, 1):
         document.add_heading(f"{title} (ID: {test_idx})", 0)
 
-        for answer_idx, answer in enumerate(test.answer_key, 1):
-            document.add_paragraph(f"{answer_idx} - {answer}")
+        for question_idx, question in enumerate(test.questions, 1):
+            answer_text = None
+            if question.question_type == QuestionType.BOOLEAN:
+                answer_text = str(question.boolean)
+            elif question.question_type == QuestionType.MULTIPLE_CHOICE:
+                answer_text = " or ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
+            elif question.question_type == QuestionType.SELECT_ALL:
+                answer_text = " and ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
+            elif question.question_type == QuestionType.SHORT_ANSWER:
+                answer_text = question.response
+            else:
+                raise NotImplementedError
+
+            document.add_paragraph(f"{question_idx} - {answer_text}")
 
         document.add_paragraph()
         document.add_page_break()
@@ -224,16 +200,16 @@ def tests_to_doc(tests: list[Test], title: str):
 
 def parse_marked_string(string: str):
     is_marked = string.startswith("-")
-    prompt = string.lstrip("-").lstrip() if is_marked else string
+    text = string.lstrip("-").lstrip() if is_marked else string
 
-    return prompt, is_marked
+    return text, is_marked
 
 
 def lcount(string: str, *patterns: list[str]):
     return max(len(string) - len(string.lstrip(pattern)) for pattern in patterns)
 
 
-def parse_txt_to_testbank(filepath: str):
+def parse_txt_to_test(filepath: str):
     with open(filepath) as rf:
         lines = (line for line in (line.rstrip() for line in rf.readlines()) if line)
 
@@ -243,7 +219,9 @@ def parse_txt_to_testbank(filepath: str):
     )
 
     next(groups)  # title marker
-    testbank = TestBank(title=list(next(groups)[1])[0].lstrip())
+    title = title=list(next(groups)[1])[0].lstrip()
+
+    questions = list()
 
     question_type = None
     while (group := next(groups, None)) is not None:
@@ -262,17 +240,17 @@ def parse_txt_to_testbank(filepath: str):
             if question_type == QuestionType.BOOLEAN:
                 kwargs["boolean"] = "true" in answers[0].lower()
             elif question_type in (QuestionType.MULTIPLE_CHOICE, QuestionType.SELECT_ALL):
-                kwargs["answers"] = [Answer.from_marked_string(string) for string in group[1]]
+                kwargs["answers"] = [Answer(*parse_marked_string(string)) for string in answers]
             elif question_type == QuestionType.SHORT_ANSWER:
                 kwargs["response"] = answers[0]
             else:
                 raise NotImplementedError
 
-            testbank.questions.append(Question(**kwargs))
+            questions.append(Question(**kwargs))
 
-    return testbank
+    return Test(title=title, questions=questions)
 
 
 if __name__ == "__main__":
-    testbank = parse_txt_to_testbank("example_test.txt")
-    tests_to_doc(generate_n_tests(testbank, 5), testbank.title)
+    testbank = parse_txt_to_test("example_test.txt")
+    tests_to_doc(generate_n_tests(testbank, 2))

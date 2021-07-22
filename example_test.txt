@@ -15,10 +15,16 @@ Multiple Choice
         Green
         Orange
 
-    - What color is the sky?
-        - Blue
-        Red
+    - What color is an apple?
+        Blue
+        - Red
         Green
+        Orange
+
+    - What color is a turtle?
+        Blue
+        Red
+        - Green
         Orange
 
 Select All
@@ -28,15 +34,15 @@ Select All
         My feet are stinky.
         - Paper is usually white.
 
-    Which of the following are true statements?
-        - The sky is blue.
-        Your mom is fat.
-        My feet are stinky.
-        - Paper is usually white.
+    Which of the following are false statements?
+        The sky is blue.
+        - Your mom is fat.
+        - My feet are stinky.
+        Paper is usually white.
 
 Short Answer
     Describle IP in your own words.
         numbers that do things
 
-    - Describle IP in your own words.
-        numbers that do things
+    - How are you today?
+        Something about being motivated
