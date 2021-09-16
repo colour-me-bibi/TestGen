@@ -6,14 +6,25 @@
 __author__ = "Benjamin Foreman (bennyforeman1@gmail.com)"
 
 
+# TODO points append points to end of test prompts
+# TODO points target and sliders
+# TODO text justification, measuring text on single page
+# TODO overall classification in header and footer
+# TODO export to pdf
+# TODO matching table question type
+
+
 import itertools as it
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from string import ascii_uppercase
+import re
 
 from docx import Document  # pip install python-docx
+# from docx2pdf import convert # pip install docx2pdf
+# convert("input.docx")
 
 
 class QuestionType(Enum):
@@ -55,6 +66,19 @@ class Question:
     answers: list[Answer] = field(default_factory=list)
     response: str = None  # could be EEIs as a list of strings
     is_required: bool = False
+    points: int = None
+
+    def __post_init__(self):
+        if match := re.search(r"\[.*?(\d+).*?\]\s*$", self.prompt):
+            self.points = int(match.group(1))
+        elif self.question_type is QuestionType.BOOLEAN:
+            self.points = 1
+        elif self.question_type == QuestionType.MULTIPLE_CHOICE:
+            self.points = 2
+        elif self.question_type == QuestionType.SELECT_ALL:
+            self.points = 2
+        elif self.question_type == QuestionType.SHORT_ANSWER:
+            self.points = 3
 
 
 @dataclass
@@ -148,6 +172,10 @@ def tests_to_doc(tests: list[Test]):
 
     document = Document()
 
+    overall_classification = "\tFOUO//UNCLASSIFIED"
+    document.sections[0].header.paragraphs[0].text = overall_classification
+    document.sections[0].footer.paragraphs[0].text = overall_classification
+
     for test_idx, test in enumerate(tests, 1):
         document.add_heading(f"{title} (ID: {test_idx})", 0)
 
@@ -182,9 +210,13 @@ def tests_to_doc(tests: list[Test]):
             if question.question_type == QuestionType.BOOLEAN:
                 answer_text = str(question.boolean)
             elif question.question_type == QuestionType.MULTIPLE_CHOICE:
-                answer_text = " or ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
+                answer_text = " or ".join(
+                    ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct
+                )
             elif question.question_type == QuestionType.SELECT_ALL:
-                answer_text = " and ".join(ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct)
+                answer_text = " and ".join(
+                    ascii_uppercase[i] for i, answer in enumerate(question.answers) if answer.is_correct
+                )
             elif question.question_type == QuestionType.SHORT_ANSWER:
                 answer_text = question.response
             else:
@@ -219,7 +251,7 @@ def parse_txt_to_test(filepath: str):
     )
 
     next(groups)  # title marker
-    title = title=list(next(groups)[1])[0].lstrip()
+    title = title = list(next(groups)[1])[0].lstrip()
 
     questions = list()
 
